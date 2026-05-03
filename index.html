@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rutina Gym</title>
+  <style>
+    :root {
+      --bg:#111827; --card:#1f2937; --card2:#273244; --text:#f9fafb;
+      --muted:#9ca3af; --accent:#38bdf8; --green:#22c55e;
+      --danger:#ef4444; --border:#374151; --yellow:#facc15;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:18px}
+    .app{max-width:840px;margin:0 auto}.header{margin-bottom:14px}.header p{color:var(--muted);margin:6px 0 0;line-height:1.4}
+    h1,h2,h3{margin:0}.hidden{display:none!important}
+    button{border:0;border-radius:12px;padding:11px 10px;font-weight:800;color:var(--text);background:var(--card2);cursor:pointer}
+    button.active{background:var(--accent);color:#082f49}.save{background:var(--green);color:#052e16}.clear{background:var(--danger);color:#fff}.export{background:var(--yellow);color:#422006}.import{background:var(--accent);color:#082f49}
+    .top-tabs,.actions,.backup-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}.backup-actions{grid-template-columns:1fr;}
+    .day-buttons{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5}
+    .card,.exercise,.history,.dashboard-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:12px}.card small{color:var(--muted);display:block;margin-top:5px}
+    .exercise-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:10px}.exercise-name{font-size:17px;font-weight:900;line-height:1.25}.muscle{color:var(--muted);font-size:14px;margin-top:4px;line-height:1.35}.target{color:var(--accent);font-size:13px;font-weight:800;white-space:nowrap;margin-top:2px}
+    .sets{display:grid;gap:8px}.set-row{display:grid;grid-template-columns:46px 1fr 1fr 42px;gap:8px;align-items:center}.set-label{color:var(--muted);font-size:14px;font-weight:800}
+    input,select{width:100%;border:1px solid var(--border);background:#111827;color:var(--text);border-radius:10px;padding:10px;font-size:15px}input[type="checkbox"]{width:24px;height:24px;accent-color:var(--green)}.notes{margin-top:10px}
+    .message{color:var(--green);font-weight:800;text-align:center;min-height:24px;margin-bottom:12px}.history-item{border-top:1px solid var(--border);padding:10px 0;color:var(--muted);font-size:14px}.history-item strong{color:var(--text)}
+    .metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}.metric{background:var(--card2);border:1px solid var(--border);border-radius:16px;padding:12px}.label{color:var(--muted);font-size:13px;margin-bottom:4px}.value{font-size:22px;font-weight:900}
+    .chart-controls{display:grid;grid-template-columns:1fr;gap:8px;margin:10px 0 12px}.bar-row{display:grid;grid-template-columns:110px 1fr 84px;gap:8px;align-items:center;margin:9px 0;font-size:14px}.bar-label{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-bg{background:#111827;border:1px solid var(--border);height:16px;border-radius:999px;overflow:hidden}.bar-fill{height:100%;background:var(--accent);border-radius:999px}.bar-value{text-align:right;font-weight:800}.empty{color:var(--muted);line-height:1.5}.small-note{color:var(--muted);font-size:13px;line-height:1.4;margin-top:8px}.line-chart{width:100%;height:240px;background:#111827;border:1px solid var(--border);border-radius:16px;padding:10px;overflow:hidden}
+    @media(max-width:620px){body{padding:12px}.day-buttons{gap:6px}button{padding:10px 6px;font-size:13px}.set-row{grid-template-columns:40px 1fr 1fr 34px;gap:6px}.metric-grid{grid-template-columns:1fr}.bar-row{grid-template-columns:88px 1fr 72px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="header">
+      <h1>Rutina Gym</h1>
+      <p>Registro de kg, repeticiones, series completadas, historial, respaldo y dashboard.</p>
+    </section>
+
+    <nav class="top-tabs">
+      <button id="tabWorkout" class="active" onclick="setView('workout')">Rutina</button>
+      <button id="tabDashboard" onclick="setView('dashboard')">Dashboard</button>
+    </nav>
+
+    <section id="workoutView">
+      <nav class="day-buttons" id="dayButtons"></nav>
+      <section class="card"><h2 id="dayTitle"></h2><small id="daySubtitle"></small></section>
+      <section id="workout"></section>
+      <div class="actions"><button class="save" onclick="saveWorkout()">Guardar día</button><button class="clear" onclick="clearToday()">Limpiar</button></div>
+      <div class="backup-actions">
+        <button class="export" onclick="exportBackup()">Exportar respaldo JSON</button>
+        <button class="export" onclick="exportCsv()">Exportar datos CSV</button>
+        <button class="import" onclick="document.getElementById('importFile').click()">Importar respaldo JSON</button>
+        <input id="importFile" class="hidden" type="file" accept="application/json,.json" onchange="importBackup(event)" />
+      </div>
+      <div class="message" id="message"></div>
+      <section class="history"><h3>Historial reciente</h3><div id="historyList"></div></section>
+    </section>
+
+    <section id="dashboardView" class="hidden">
+      <section class="card"><h2>Dashboard de progreso</h2><small>El volumen se calcula como kg × reps solo en series marcadas como hechas.</small></section>
+      <section class="dashboard-card"><h3>Filtro de semana</h3><div class="chart-controls"><select id="weekSelect" onchange="renderDashboard()"></select></div><p class="small-note">Puedes ver todas las semanas o una semana específica. La semana parte el lunes.</p></section>
+      <section class="metric-grid" id="metricGrid"></section>
+      <section class="dashboard-card"><h3>Volumen por músculo</h3><div id="muscleVolumeChart"></div><p class="small-note">Un ejercicio puede contar para más de un músculo según la rutina.</p></section>
+      <section class="dashboard-card"><h3>Volumen semanal total</h3><div id="weeklyVolumeChart"></div></section>
+      <section class="dashboard-card"><h3>Progresión por ejercicio</h3><div class="chart-controls"><select id="exerciseSelect" onchange="renderDashboard()"></select></div><div id="exerciseProgressChart"></div><p class="small-note">Muestra el mayor peso registrado por fecha para el ejercicio seleccionado.</p></section>
+    </section>
+  </main>
+
+  <script>
+    var routine = [
+      {title:"Día 1 — Pecho + tríceps",subtitle:"Enfoque: pecho y tríceps, sin apertura en polea alta.",exercises:[
+        {name:"Press pecho con mancuernas en banco plano",target:"3x8-12",muscle:"pectoral medio, tríceps y deltoide anterior",groups:["Pecho","Tríceps","Hombro"],sets:3},
+        {name:"Press inclinado con mancuernas",target:"3x8-12",muscle:"pectoral superior, tríceps y deltoide anterior",groups:["Pecho","Tríceps","Hombro"],sets:3},
+        {name:"Aperturas en máquina / pec deck",target:"3x12-15",muscle:"pectoral, especialmente al cerrar los brazos",groups:["Pecho"],sets:3},
+        {name:"Press vertical máquina",target:"2x10-12",muscle:"pectoral medio, tríceps y hombro anterior",groups:["Pecho","Tríceps","Hombro"],sets:2},
+        {name:"Tríceps en polea con cuerda",target:"3x10-12",muscle:"tríceps, sobre todo cabeza lateral",groups:["Tríceps"],sets:3},
+        {name:"Extensión de tríceps sobre cabeza con cuerda",target:"3x12-15",muscle:"tríceps, sobre todo cabeza larga",groups:["Tríceps"],sets:3},
+        {name:"Tríceps con barra recta en polea",target:"2x12",muscle:"tríceps completo, énfasis general",groups:["Tríceps"],sets:2}
+      ]},
+      {title:"Día 2 — Espalda + bíceps",subtitle:"Enfoque: espalda con máquinas y bíceps.",exercises:[
+        {name:"Jalón al pecho agarre amplio",target:"3x10-12",muscle:"dorsal ancho, espalda alta y bíceps como apoyo",groups:["Espalda","Bíceps"],sets:3},
+        {name:"Jalón al pecho supinación",target:"3x10-12",muscle:"dorsal ancho, bíceps y zona media de la espalda",groups:["Espalda","Bíceps"],sets:3},
+        {name:"Low row / remo agarre cerrado",target:"3x10-12",muscle:"espalda media, romboides, trapecio medio y dorsal",groups:["Espalda"],sets:3},
+        {name:"Gironda al pecho",target:"2-3x10-12",muscle:"dorsal ancho, espalda media y bíceps como apoyo",groups:["Espalda","Bíceps"],sets:3},
+        {name:"Curl bíceps con barra Z",target:"3x10-12",muscle:"bíceps braquial completo",groups:["Bíceps"],sets:3},
+        {name:"Curl martillo con mancuernas",target:"3x10-12",muscle:"braquial, braquiorradial y grosor del brazo",groups:["Bíceps","Antebrazo"],sets:3},
+        {name:"Curl predicador en máquina o banco Scott",target:"2-3x12",muscle:"bíceps, énfasis en aislamiento y control",groups:["Bíceps"],sets:3}
+      ]},
+      {title:"Día 3 — Hombro + brazos",subtitle:"Enfoque: hombro lateral/posterior y bombeo de brazos.",exercises:[
+        {name:"Press hombros en máquina",target:"3x10-12",muscle:"deltoide anterior, deltoide lateral y tríceps",groups:["Hombro","Tríceps"],sets:3},
+        {name:"Elevaciones laterales con mancuernas",target:"4x12-15",muscle:"deltoide lateral, el músculo que da anchura al hombro",groups:["Hombro"],sets:4},
+        {name:"Elevación frontal con polea o mancuerna",target:"2x12",muscle:"deltoide anterior",groups:["Hombro"],sets:2},
+        {name:"Face pull en polea",target:"3x12-15",muscle:"deltoide posterior, trapecio medio/bajo y estabilidad del hombro",groups:["Hombro","Espalda"],sets:3},
+        {name:"Curl bíceps en polea baja",target:"3x12",muscle:"bíceps, tensión constante durante todo el recorrido",groups:["Bíceps"],sets:3},
+        {name:"Tríceps en polea con cuerda",target:"3x12",muscle:"tríceps, sobre todo cabeza lateral",groups:["Tríceps"],sets:3},
+        {name:"Curl martillo con cuerda",target:"2x12-15",muscle:"braquial, braquiorradial y grosor del brazo",groups:["Bíceps","Antebrazo"],sets:2},
+        {name:"Extensión tríceps sobre cabeza con cuerda",target:"2x12-15",muscle:"tríceps, sobre todo cabeza larga",groups:["Tríceps"],sets:2}
+      ]},
+      {title:"Día 4 — Pierna + core",subtitle:"Enfoque: pierna con cuidado de espalda baja.",exercises:[
+        {name:"Prensa 45°",target:"3x10-12",muscle:"cuádriceps, glúteo e isquios como apoyo",groups:["Pierna","Glúteo"],sets:3},
+        {name:"Extensión de rodillas en máquina",target:"3x12",muscle:"cuádriceps, parte frontal del muslo",groups:["Pierna"],sets:3},
+        {name:"Isquiosural tumbado / curl femoral acostado",target:"3x12",muscle:"isquiotibiales, parte posterior del muslo",groups:["Pierna"],sets:3},
+        {name:"Extensión de rodillas en prensa",target:"2x12",muscle:"cuádriceps, con apoyo de glúteo según posición de pies",groups:["Pierna","Glúteo"],sets:2},
+        {name:"Elevaciones de talones en máquina de pie",target:"4x12-15",muscle:"gemelos/pantorrilla",groups:["Pantorrilla"],sets:4},
+        {name:"Hip thrust en máquina o puente de glúteos",target:"3x10-12",muscle:"glúteo mayor e isquios como apoyo",groups:["Glúteo","Pierna"],sets:3},
+        {name:"Dead bug",target:"3x10 por lado",muscle:"core profundo, abdomen y estabilidad lumbar",groups:["Core"],sets:3},
+        {name:"Plancha",target:"3x20-40 s",muscle:"core completo y estabilidad lumbar",groups:["Core"],sets:3}
+      ]},
+      {title:"Día 5 — Brazos + pecho/espalda suave",subtitle:"Enfoque: día fuerte de brazos.",exercises:[
+        {name:"Press pecho con mancuernas liviano/moderado",target:"2x10-12",muscle:"pectoral medio, tríceps y deltoide anterior",groups:["Pecho","Tríceps","Hombro"],sets:2},
+        {name:"Jalón al pecho agarre amplio o supinación",target:"2x10-12",muscle:"dorsal ancho, espalda alta y bíceps como apoyo",groups:["Espalda","Bíceps"],sets:2},
+        {name:"Curl bíceps con barra Z",target:"3x8-12",muscle:"bíceps braquial completo",groups:["Bíceps"],sets:3},
+        {name:"Tríceps en polea con cuerda",target:"3x10-12",muscle:"tríceps, sobre todo cabeza lateral",groups:["Tríceps"],sets:3},
+        {name:"Curl inclinado con mancuernas",target:"3x10-12",muscle:"bíceps, sobre todo cabeza larga",groups:["Bíceps"],sets:3},
+        {name:"Extensión tríceps sobre cabeza con cuerda",target:"3x12",muscle:"tríceps, sobre todo cabeza larga",groups:["Tríceps"],sets:3},
+        {name:"Curl martillo con mancuernas",target:"3x10-12",muscle:"braquial, braquiorradial y grosor del brazo",groups:["Bíceps","Antebrazo"],sets:3},
+        {name:"Tríceps en polea con barra recta",target:"2x12-15",muscle:"tríceps completo, énfasis general",groups:["Tríceps"],sets:2},
+        {name:"Curl en polea baja",target:"2x12-15",muscle:"bíceps, tensión constante y bombeo final",groups:["Bíceps"],sets:2}
+      ]}
+    ];
+
+    var currentDay = 0;
+
+    function storageKey(){return "rutina-gym-dia-"+(currentDay+1)}
+    function historyKey(){return "rutina-gym-historial"}
+
+    function setView(view){
+      if(view === "dashboard"){ saveDraft(); renderDashboard(); }
+      document.getElementById("workoutView").classList.toggle("hidden", view !== "workout");
+      document.getElementById("dashboardView").classList.toggle("hidden", view !== "dashboard");
+      document.getElementById("tabWorkout").classList.toggle("active", view === "workout");
+      document.getElementById("tabDashboard").classList.toggle("active", view === "dashboard");
+    }
+
+    function renderButtons(){
+      var box=document.getElementById("dayButtons"); box.innerHTML="";
+      routine.forEach(function(_,i){
+        var b=document.createElement("button"); b.textContent="Día "+(i+1); b.className=i===currentDay?"active":"";
+        b.onclick=function(){ saveDraft(); currentDay=i; renderWorkout(); };
+        box.appendChild(b);
+      });
+    }
+
+    function renderWorkout(){
+      renderButtons();
+      var day=routine[currentDay];
+      document.getElementById("dayTitle").textContent=day.title;
+      document.getElementById("daySubtitle").textContent=day.subtitle;
+      var saved=safeJson(localStorage.getItem(storageKey()),{});
+      var workout=document.getElementById("workout"); workout.innerHTML="";
+
+      day.exercises.forEach(function(ex,exIndex){
+        var card=document.createElement("article"); card.className="exercise";
+        var setsHtml="";
+        for(var s=0;s<ex.sets;s++){
+          var setData=(saved[exIndex] && saved[exIndex].sets && saved[exIndex].sets[s]) ? saved[exIndex].sets[s] : {};
+          setsHtml += '<div class="set-row">'
+            + '<div class="set-label">S'+(s+1)+'</div>'
+            + '<input inputmode="decimal" placeholder="kg" value="'+escapeHtml(setData.kg || '')+'" data-ex="'+exIndex+'" data-set="'+s+'" data-type="kg">'
+            + '<input inputmode="numeric" placeholder="reps" value="'+escapeHtml(setData.reps || '')+'" data-ex="'+exIndex+'" data-set="'+s+'" data-type="reps">'
+            + '<input type="checkbox" '+(setData.done?'checked':'')+' data-ex="'+exIndex+'" data-set="'+s+'" data-type="done">'
+            + '</div>';
+        }
+        var note=(saved[exIndex] && saved[exIndex].note) ? saved[exIndex].note : "";
+        card.innerHTML = '<div class="exercise-head"><div><div class="exercise-name">'+ex.name+'</div><div class="muscle">('+ex.muscle+')</div></div><div class="target">'+ex.target+'</div></div>'
+          + '<div class="sets">'+setsHtml+'</div>'
+          + '<div class="notes"><input placeholder="Nota opcional" value="'+escapeHtml(note)+'" data-ex="'+exIndex+'" data-type="note"></div>';
+        workout.appendChild(card);
+      });
+
+      document.querySelectorAll("#workout input").forEach(function(input){
+        input.addEventListener("change", saveDraft);
+        input.addEventListener("input", saveDraft);
+      });
+      renderHistory();
+    }
+
+    function collectInputs(){
+      var data={};
+      document.querySelectorAll("#workout input").forEach(function(input){
+        var ex=input.dataset.ex, set=input.dataset.set, type=input.dataset.type;
+        if(ex===undefined) return;
+        if(!data[ex]) data[ex]={sets:[],note:""};
+        if(type==="note") data[ex].note=input.value;
+        else{
+          if(!data[ex].sets[set]) data[ex].sets[set]={};
+          data[ex].sets[set][type]= type==="done" ? input.checked : input.value;
+        }
+      });
+      return data;
+    }
+
+    function saveDraft(){
+      var workout=document.getElementById("workout");
+      if(!workout || workout.children.length===0) return;
+      localStorage.setItem(storageKey(), JSON.stringify(collectInputs()));
+    }
+
+    function saveWorkout(){
+      saveDraft();
+      var data=collectInputs();
+      var history=safeJson(localStorage.getItem(historyKey()),[]);
+      var now=new Date();
+      var dateText=now.toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"})+" "+now.toLocaleTimeString("es-CL",{hour:"2-digit",minute:"2-digit"});
+      history.unshift({id:Date.now(),iso:now.toISOString(),date:dateText,dayIndex:currentDay,day:routine[currentDay].title,data:data});
+      localStorage.setItem(historyKey(), JSON.stringify(history.slice(0,300)));
+      showMessage("Entrenamiento guardado.");
+      renderHistory();
+    }
+
+    function clearToday(){
+      if(!confirm("¿Seguro que quieres limpiar el día actual? El historial guardado no se borra.")) return;
+      localStorage.removeItem(storageKey());
+      renderWorkout();
+      showMessage("Día limpiado.");
+    }
+
+    function renderHistory(){
+      var history=safeJson(localStorage.getItem(historyKey()),[]);
+      var list=document.getElementById("historyList");
+      if(history.length===0){ list.innerHTML='<p class="empty" style="margin:0">Aún no hay entrenamientos guardados.</p>'; return; }
+      list.innerHTML=history.slice(0,12).map(function(item){return '<div class="history-item"><strong>'+(item.date || formatDate(item.iso))+'</strong><br>'+escapeHtml(item.day || '')+'</div>';}).join("");
+    }
+
+    function exportBackup(){
+      saveDraft();
+      var backup={app:"rutina-gym-simple",version:3,exportedAt:new Date().toISOString(),days:{},history:safeJson(localStorage.getItem(historyKey()),[])};
+      for(var i=0;i<routine.length;i++) backup.days["rutina-gym-dia-"+(i+1)] = safeJson(localStorage.getItem("rutina-gym-dia-"+(i+1)),{});
+      downloadFile("respaldo_rutina_gym_"+new Date().toISOString().slice(0,10)+".json", JSON.stringify(backup,null,2), "application/json;charset=utf-8");
+      showMessage("Respaldo JSON exportado.");
+    }
+
+    function exportCsv(){
+      saveDraft();
+      var entries=getHistoryEntries();
+      if(entries.length===0){ alert("Todavía no hay datos guardados para exportar en CSV."); return; }
+      var rows=[["Fecha","Semana","Dia","Ejercicio","Musculos","Serie","Kg","Reps","Volumen"]];
+      entries.forEach(function(e){ rows.push([e.date.toISOString().slice(0,10),e.week,e.dayTitle,e.exerciseName,e.groups.join(" | "),e.setIndex+1,e.kg,e.reps,e.volume]); });
+      var csv=rows.map(function(row){return row.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(",");}).join("\n");
+      downloadFile("datos_rutina_gym_"+new Date().toISOString().slice(0,10)+".csv", "\ufeff"+csv, "text/csv;charset=utf-8");
+      showMessage("CSV exportado.");
+    }
+
+    function importBackup(event){
+      var file=event.target.files[0]; if(!file) return;
+      var reader=new FileReader();
+      reader.onload=function(e){
+        try{
+          var backup=JSON.parse(e.target.result);
+          if(!backup || backup.app!=="rutina-gym-simple"){ alert("Este archivo no parece ser un respaldo válido."); return; }
+          if(!confirm("Esto reemplazará tus datos actuales por el respaldo importado. ¿Continuar?")) return;
+          if(backup.days){ Object.keys(backup.days).forEach(function(key){ localStorage.setItem(key, JSON.stringify(backup.days[key] || {})); }); }
+          if(Array.isArray(backup.history)) localStorage.setItem(historyKey(), JSON.stringify(backup.history));
+          renderWorkout(); showMessage("Respaldo importado.");
+        }catch(err){ alert("No se pudo importar el archivo JSON."); }
+        event.target.value="";
+      };
+      reader.readAsText(file);
+    }
+
+    function renderDashboard(){
+      var allEntries=getHistoryEntries();
+      populateWeekSelect(allEntries);
+      var weekSelect=document.getElementById("weekSelect");
+      var selectedWeek=weekSelect ? weekSelect.value : "all";
+      var entries= selectedWeek==="all" ? allEntries : allEntries.filter(function(e){return e.week===selectedWeek;});
+      var metricGrid=document.getElementById("metricGrid");
+      if(allEntries.length===0){
+        metricGrid.innerHTML='<div class="dashboard-card empty">Todavía no hay datos suficientes. Guarda entrenamientos marcando series como hechas para que aparezcan las métricas.</div>';
+        document.getElementById("muscleVolumeChart").innerHTML=""; document.getElementById("weeklyVolumeChart").innerHTML=""; document.getElementById("exerciseProgressChart").innerHTML=""; populateExerciseSelect([]); return;
+      }
+      var total=entries.reduce(function(sum,e){return sum+e.volume;},0);
+      var workouts={}; entries.forEach(function(e){workouts[e.workoutId]=true;});
+      var best=entries.reduce(function(b,e){return (!b || e.kg>b.kg)?e:b;},null);
+      metricGrid.innerHTML='<div class="metric"><div class="label">Volumen filtrado</div><div class="value">'+formatNumber(total)+' kg</div></div><div class="metric"><div class="label">Entrenamientos</div><div class="value">'+Object.keys(workouts).length+'</div></div><div class="metric"><div class="label">Mayor peso</div><div class="value">'+(best?formatNumber(best.kg):0)+' kg</div></div>';
+      renderMuscleVolumeChart(entries);
+      renderWeeklyVolumeChart(allEntries);
+      var exerciseNames=unique(allEntries.map(function(e){return e.exerciseName;})).sort();
+      populateExerciseSelect(exerciseNames);
+      renderExerciseProgressChart(allEntries);
+    }
+
+    function getHistoryEntries(){
+      var history=safeJson(localStorage.getItem(historyKey()),[]), entries=[];
+      history.forEach(function(workout,wi){
+        var dayIndex=Number.isInteger(workout.dayIndex)?workout.dayIndex:inferDayIndex(workout.day);
+        var day=routine[dayIndex]; if(!day) return;
+        var date=workout.iso?new Date(workout.iso):new Date();
+        var workoutId=workout.id || (workout.iso || workout.date || wi);
+        Object.keys(workout.data || {}).forEach(function(exKey){
+          var exIndex=Number(exKey), exData=workout.data[exKey], ex=day.exercises[exIndex]; if(!ex) return;
+          (exData.sets || []).forEach(function(set,setIndex){
+            if(!set || !set.done) return;
+            var kg=parseNumber(set.kg), reps=parseNumber(set.reps); if(!kg || !reps) return;
+            entries.push({workoutId:workoutId,date:date,week:getWeekKey(date),dayTitle:day.title,exerciseName:ex.name,groups:ex.groups || [],setIndex:setIndex,kg:kg,reps:reps,volume:kg*reps});
+          });
+        });
+      });
+      return entries.sort(function(a,b){return a.date-b.date;});
+    }
+
+    function populateWeekSelect(entries){
+      var select=document.getElementById("weekSelect"); if(!select) return;
+      var previous=select.value || "all";
+      var weeks=unique(entries.map(function(e){return e.week;})).sort().reverse();
+      select.innerHTML='<option value="all">Todas las semanas</option>'+weeks.map(function(w){return '<option value="'+w+'">Semana del '+w+'</option>';}).join("");
+      if(previous==="all" || weeks.indexOf(previous)>=0) select.value=previous;
+    }
+
+    function populateExerciseSelect(names){
+      var select=document.getElementById("exerciseSelect"); if(!select) return;
+      var previous=select.value;
+      select.innerHTML=names.map(function(n){return '<option value="'+escapeHtml(n)+'">'+escapeHtml(n)+'</option>';}).join("");
+      if(names.indexOf(previous)>=0) select.value=previous;
+    }
+
+    function renderMuscleVolumeChart(entries){
+      var by={}; entries.forEach(function(e){e.groups.forEach(function(g){by[g]=(by[g]||0)+e.volume;});});
+      document.getElementById("muscleVolumeChart").innerHTML=renderBars(Object.keys(by).map(function(k){return [k,by[k]];}).sort(function(a,b){return b[1]-a[1];}),"kg");
+    }
+
+    function renderWeeklyVolumeChart(entries){
+      var by={}; entries.forEach(function(e){by[e.week]=(by[e.week]||0)+e.volume;});
+      document.getElementById("weeklyVolumeChart").innerHTML=renderBars(Object.keys(by).sort().slice(-8).map(function(k){return [k,by[k]];}),"kg");
+    }
+
+    function renderExerciseProgressChart(entries){
+      var select=document.getElementById("exerciseSelect"), name=select?select.value:"", container=document.getElementById("exerciseProgressChart");
+      if(!name){ container.innerHTML='<p class="empty">No hay ejercicios registrados todavía.</p>'; return; }
+      var by={}; entries.filter(function(e){return e.exerciseName===name;}).forEach(function(e){var k=e.date.toISOString().slice(0,10); by[k]=Math.max(by[k]||0,e.kg);});
+      var points=Object.keys(by).sort().map(function(k){return {date:k,kg:by[k]};});
+      container.innerHTML=renderLineChart(points);
+    }
+
+    function renderBars(rows,unit){
+      if(rows.length===0) return '<p class="empty">Aún no hay datos para graficar.</p>';
+      var max=Math.max.apply(null, rows.map(function(r){return r[1];})) || 1;
+      return rows.map(function(r){var w=Math.max(3,(r[1]/max)*100);return '<div class="bar-row"><div class="bar-label" title="'+escapeHtml(r[0])+'">'+escapeHtml(r[0])+'</div><div class="bar-bg"><div class="bar-fill" style="width:'+w+'%"></div></div><div class="bar-value">'+formatNumber(r[1])+' '+unit+'</div></div>';}).join("");
+    }
+
+    function renderLineChart(points){
+      if(points.length===0) return '<p class="empty">Todavía no hay datos para este ejercicio.</p>';
+      if(points.length===1) return '<p class="empty">Primer registro: '+points[0].date+' — '+formatNumber(points[0].kg)+' kg. Con más sesiones aparecerá la línea de progreso.</p>';
+      var width=760,height=220,pad=34,minY=Math.min.apply(null,points.map(function(p){return p.kg;})),maxY=Math.max.apply(null,points.map(function(p){return p.kg;})),range=maxY-minY || 1;
+      var coords=points.map(function(p,i){return {date:p.date,kg:p.kg,x:pad+(i/(points.length-1))*(width-pad*2),y:height-pad-((p.kg-minY)/range)*(height-pad*2)};});
+      var poly=coords.map(function(p){return p.x+','+p.y;}).join(' ');
+      var circles=coords.map(function(p){return '<circle cx="'+p.x+'" cy="'+p.y+'" r="4" fill="var(--accent)"><title>'+p.date+': '+formatNumber(p.kg)+' kg</title></circle>';}).join('');
+      return '<svg class="line-chart" viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="none"><line x1="'+pad+'" y1="'+(height-pad)+'" x2="'+(width-pad)+'" y2="'+(height-pad)+'" stroke="#374151"/><line x1="'+pad+'" y1="'+pad+'" x2="'+pad+'" y2="'+(height-pad)+'" stroke="#374151"/><text x="'+pad+'" y="18" fill="#9ca3af" font-size="12">'+formatNumber(maxY)+' kg</text><text x="'+pad+'" y="'+(height-pad-6)+'" fill="#9ca3af" font-size="12">'+formatNumber(minY)+' kg</text><polyline fill="none" stroke="var(--accent)" stroke-width="4" points="'+poly+'"/>'+circles+'</svg>';
+    }
+
+    function downloadFile(filename,content,type){var blob=new Blob([content],{type:type});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
+    function inferDayIndex(t){var m=String(t||"").match(/Día\s+(\d+)/i);return m?Number(m[1])-1:0}
+    function getWeekKey(date){var d=new Date(date);var day=d.getDay()||7;d.setDate(d.getDate()-day+1);return formatLocalDate(d)}
+    function formatLocalDate(date){var y=date.getFullYear();var m=String(date.getMonth()+1).padStart(2,"0");var d=String(date.getDate()).padStart(2,"0");return y+"-"+m+"-"+d}
+    function parseNumber(v){return Number(String(v==null?"":v).replace(",",".")) || 0}
+    function formatNumber(v){return Math.round(v*10)/10}
+    function formatDate(iso){return iso?new Date(iso).toLocaleDateString("es-CL",{day:"2-digit",month:"2-digit",year:"numeric"}):"Sin fecha"}
+    function unique(arr){return arr.filter(function(v,i,a){return a.indexOf(v)===i;});}
+    function safeJson(text,fallback){try{return text?JSON.parse(text):fallback}catch(e){return fallback}}
+    function escapeHtml(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
+    function showMessage(text){var msg=document.getElementById("message");msg.textContent=text;setTimeout(function(){msg.textContent=""},2200)}
+
+    renderWorkout();
+  </script>
+</body>
+</html>
