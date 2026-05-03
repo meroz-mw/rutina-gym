@@ -49,6 +49,7 @@
         <button class="export" onclick="exportBackup()">Exportar respaldo JSON</button>
         <button class="export" onclick="exportCsv()">Exportar datos CSV</button>
         <button class="import" onclick="document.getElementById('importFile').click()">Importar respaldo JSON</button>
+        <button class="clear" onclick="clearAllData()">Borrar todos los datos</button>
         <input id="importFile" class="hidden" type="file" accept="application/json,.json" onchange="importBackup(event)" />
       </div>
       <div class="message" id="message"></div>
@@ -212,6 +213,15 @@
       localStorage.removeItem(storageKey());
       renderWorkout();
       showMessage("Día limpiado.");
+    }
+
+    function clearAllData(){
+      var ok = confirm("¿Seguro que quieres borrar TODOS los datos de la app? Se borrarán borradores, historial y dashboard. Te conviene exportar un respaldo JSON antes si tienes datos reales.");
+      if(!ok) return;
+      for(var i=0;i<routine.length;i++) localStorage.removeItem("rutina-gym-dia-"+(i+1));
+      localStorage.removeItem(historyKey());
+      renderWorkout();
+      showMessage("Todos los datos fueron borrados.");
     }
 
     function renderHistory(){
